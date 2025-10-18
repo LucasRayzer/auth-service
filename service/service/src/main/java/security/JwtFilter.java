@@ -38,8 +38,6 @@ public class JwtFilter extends OncePerRequestFilter {
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             jwt = authHeader.substring(7);
-
-            // Verifique se o seu código tem este bloco try-catch EXATAMENTE assim
             try {
                 username = jwtUtil.extractUsername(jwt);
             } catch (ExpiredJwtException | MalformedJwtException e) {

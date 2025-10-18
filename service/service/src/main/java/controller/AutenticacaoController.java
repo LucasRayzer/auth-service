@@ -21,10 +21,9 @@ public class AutenticacaoController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request){
-        String token = autenticacao.login(request.getUsername(), request.getPassword());
-        return ResponseEntity.ok(new AuthResponse(token));
+        AuthResponse authResponse = autenticacao.login(request.getUsername(), request.getPassword());
+        return ResponseEntity.ok(authResponse);
     }
-
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request){
         autenticacao.register(request.getUsername(), request.getPassword());

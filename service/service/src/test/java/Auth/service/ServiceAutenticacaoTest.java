@@ -1,6 +1,7 @@
 package Auth.service;
 
-
+import dto.AuthResponse;
+import java.util.Date;
 import model.User;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -54,18 +55,32 @@ class ServiceAutenticacaoTest {
 
     @Test
     void deveFazerLoginComSucesso() {
-
         String username = "usuario_existente";
         String password = "senha_correta";
-        User usuarioDoBanco = new User(1L, username, "senha_criptografada");
+        String mockToken = "token_jwt_valido";
+        Date mockExpiration = new Date(System.currentTimeMillis() + 3600000);
+
+        User usuarioDoBanco = new User(1L, username, "senha_criptografada", null, null);
 
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(usuarioDoBanco));
         when(passwordEncoder.matches(password, "senha_criptografada")).thenReturn(true);
-        when(jwtUtil.generateToken(username)).thenReturn("token_jwt_valido");
+        when(jwtUtil.generateToken(username)).thenReturn(mockToken);
 
-        String token = serviceAutenticacao.login(username, password);
+        when(jwtUtil.extractExpiration(mockToken)).thenReturn(mockExpiration);
 
-        assertThat(token).isEqualTo("token_jwt_valido");
+        AuthResponse response = serviceAutenticacao.login(username, password);
+
+        assertThat(response).isNotNull();
+        assertThat(response.getToken()).isEqualTo(mockToken);
+        assertThat(response.getExpiration()).isEqualTo(mockExpiration);
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        User usuarioSalvo = userCaptor.getValue();
+
+        assertThat(usuarioSalvo.getId()).isEqualTo(1L);
+        assertThat(usuarioSalvo.getToken()).isEqualTo(mockToken);
+        assertThat(usuarioSalvo.getTokenExpiration()).isEqualTo(mockExpiration);
     }
 
     @Test
@@ -78,16 +93,15 @@ class ServiceAutenticacaoTest {
         });
 
         assertThat(exception.getMessage()).isEqualTo("Usuário não encontrado.");
-        verify(passwordEncoder, never()).matches(any(), any()); // Garante que a senha nem foi verificada
-        verify(jwtUtil, never()).generateToken(any()); // Garante que o token não foi gerado
+        verify(passwordEncoder, never()).matches(any(), any());
+        verify(jwtUtil, never()).generateToken(any());
     }
 
     @Test
     void deveLancarExcecaoQuandoSenhaEstiverIncorretaNoLogin() {
-
         String username = "usuario_existente";
         String password = "senha_incorreta";
-        User usuarioDoBanco = new User(1L, username, "senha_criptografada");
+        User usuarioDoBanco = new User(1L, username, "senha_criptografada", null, null);
 
         when(userRepository.findByUsername(username)).thenReturn(Optional.of(usuarioDoBanco));
         when(passwordEncoder.matches(password, "senha_criptografada")).thenReturn(false);
@@ -97,6 +111,7 @@ class ServiceAutenticacaoTest {
         });
 
         assertThat(exception.getMessage()).isEqualTo("Senha incorreta.");
-        verify(jwtUtil, never()).generateToken(any()); // Garante que o token não foi gerado
+        verify(jwtUtil, never()).generateToken(any());
+        verify(userRepository, never()).save(any());
     }
 }
