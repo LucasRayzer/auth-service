@@ -35,30 +35,41 @@ public class AutenticacaoController {
     }
 
 
-    /**
-     * Espera um JSON no corpo da requisição, ex: {"token": "eyJ..."}
-     */
     @PostMapping("/validate")
-    public ResponseEntity<?> validateToken(@RequestBody Map<String, String> request) {
-        String token = request.get("token");
+    public ResponseEntity<?> validateToken(@RequestBody Map<String, String> body,
+                                           @org.springframework.web.bind.annotation.RequestHeader(value = "Authorization", required = false) String authorization) {
+        // 1) tenta pegar do body
+        String token = body != null ? body.get("token") : null;
 
-        if (token == null || token.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("valid", false, "error", "Token não fornecido."));
+        // 2) opcional: fallback para Authorization header (retrocompatível)
+        if ((token == null || token.isBlank()) && authorization != null && authorization.toLowerCase().startsWith("bearer ")) {
+            token = authorization.substring(7).trim();
         }
 
-        try {
-            boolean isValid = jwtUtil.validateToken(token);
-            if (isValid) {
-                // Se válido, extrai o username e retorna
-                String username = jwtUtil.extractUsername(token);
-                return ResponseEntity.ok(Map.of("valid", true, "username", username));
-            } else {
-                // A classe JwtUtil já trata exceções e retorna false, mas por segurança:
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("valid", false, "error", "Token inválido ou expirado."));
-            }
-        } catch (Exception e) {
-            // Captura qualquer outra exceção que possa ocorrer
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("valid", false, "error", e.getMessage()));
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Missing token"));
         }
+
+        if (!jwtUtil.validateToken(token)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        }
+
+        String username = jwtUtil.extractUsername(token);
+        var userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
+        }
+        var user = userOpt.get();
+
+        var roles = java.util.List.of("USER"); // ajuste se tiver papéis
+        var exp = jwtUtil.extractExpiration(token); // se teu JwtUtil expõe isso; senão, remove o expiresAt abaixo
+
+        return ResponseEntity.ok(Map.of(
+                "userId", user.getId(),          // Long ou UUID conforme teu modelo
+                "username", user.getUsername(),
+                "roles", roles,
+                "expiresAt", exp != null ? exp.toInstant().toString() : null
+        ));
     }
+
 }
