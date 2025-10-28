@@ -1,15 +1,19 @@
 package service;
 
+import Auth.service.client.UserClient;
 import dto.AuthResponse;
+import dto.RegisterRequest;
 import lombok.AllArgsConstructor;
-
+import model.TipoUsuario;
 import model.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional; // <== sugiro usar
 import repository.UserRepository;
 import security.JwtUtil;
 
 import java.util.Date;
+import java.util.Map;
 
 @Service
 @AllArgsConstructor
@@ -17,36 +21,43 @@ public class ServiceAutenticacao {
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
     private final PasswordEncoder passwordEncoder;
+    private final UserClient userClient;
 
     public AuthResponse login(String username, String password) {
-        //Encontra o usuário
         var user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado."));
 
-        //Valida a senha
         if (!passwordEncoder.matches(password, user.getPassword())) {
             throw new RuntimeException("Senha incorreta.");
         }
 
-        //Gera o token
         String token = jwtUtil.generateToken(username);
-
-        //Extrai a data de expiração
         Date expiration = jwtUtil.extractExpiration(token);
 
-        //Salvar o token e a expiração no usuário
         user.setToken(token);
         user.setTokenExpiration(expiration);
         userRepository.save(user);
 
-        //Retornar o DTO de resposta
         return new AuthResponse(token, expiration);
     }
 
-    public void register(String username, String password) {
-        User user = new User();
-        user.setUsername(username);
-        user.setPassword(passwordEncoder.encode(password));
-        userRepository.save(user);
+    public void register(RegisterRequest req) {
+        // 1) salvar credencial no AUTH (username = email)
+        User u = new User();
+        u.setUsername(req.getEmail());
+        u.setPassword(passwordEncoder.encode(req.getPassword()));
+        u.setTipo(req.getTipo()); // 👈 salva no AUTH também
+        userRepository.save(u);
+
+        // 2) criar usuário no USER-SERVICE
+        var payload = new UserClient.UserCreateRequest();
+        payload.nome = req.getNome();
+        payload.email = req.getEmail();
+        payload.endereco = req.getEndereco();
+        payload.telefone = req.getTelefone();
+        payload.senha = passwordEncoder.encode(req.getPassword());
+        payload.tipo = (req.getTipo() == null) ? TipoUsuario.CLIENTE : req.getTipo();
+
+        userClient.createUser(payload);
     }
 }

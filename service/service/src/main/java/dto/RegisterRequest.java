@@ -1,9 +1,21 @@
+// auth-service
 package dto;
 
-import lombok.Data;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import lombok.Getter;
+import lombok.Setter;
+import model.TipoUsuario;
 
-@Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
+@Getter
+@Setter
 public class RegisterRequest {
-    private String username;
-    private String password;
+    private String nome;
+    private String email;
+    private String endereco;
+    private String telefone;
+    private String password; // será a "senha" no user-service
+    private TipoUsuario tipo;     // opcional: "CLIENTE" (default) ou "ORGANIZADOR"
+
+
 }

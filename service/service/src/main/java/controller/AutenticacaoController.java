@@ -6,13 +6,12 @@ import dto.LoginRequest;
 import dto.AuthResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import repository.UserRepository;
 import security.JwtUtil;
 import service.ServiceAutenticacao;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -22,43 +21,51 @@ public class AutenticacaoController {
 
     private final ServiceAutenticacao autenticacao;
     private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginRequest request){
         AuthResponse authResponse = autenticacao.login(request.getUsername(), request.getPassword());
         return ResponseEntity.ok(authResponse);
     }
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody RegisterRequest request){
-        autenticacao.register(request.getUsername(), request.getPassword());
+        autenticacao.register(request);
         return ResponseEntity.status(HttpStatus.CREATED).body("Usuário cadastrado com sucesso!");
     }
 
 
-    /**
-     * Espera um JSON no corpo da requisição, ex: {"token": "eyJ..."}
-     */
     @PostMapping("/validate")
-    public ResponseEntity<?> validateToken(@RequestBody Map<String, String> request) {
-        String token = request.get("token");
+    public ResponseEntity<?> validateToken(@RequestBody Map<String, String> body,
+                                           @RequestHeader(value = "Authorization", required = false) String authorization) {
+        String token = body != null ? body.get("token") : null;
 
-        if (token == null || token.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("valid", false, "error", "Token não fornecido."));
+        if ((token == null || token.isBlank()) && authorization != null && authorization.toLowerCase().startsWith("bearer ")) {
+            token = authorization.substring(7).trim();
         }
 
-        try {
-            boolean isValid = jwtUtil.validateToken(token);
-            if (isValid) {
-                // Se válido, extrai o username e retorna
-                String username = jwtUtil.extractUsername(token);
-                return ResponseEntity.ok(Map.of("valid", true, "username", username));
-            } else {
-                // A classe JwtUtil já trata exceções e retorna false, mas por segurança:
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("valid", false, "error", "Token inválido ou expirado."));
-            }
-        } catch (Exception e) {
-            // Captura qualquer outra exceção que possa ocorrer
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("valid", false, "error", e.getMessage()));
+        if (token == null || token.isBlank()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Missing token"));
         }
+
+        if (!jwtUtil.validateToken(token)) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid or expired token"));
+        }
+
+        String username = jwtUtil.extractUsername(token);
+        var userOpt = userRepository.findByUsername(username);
+        if (userOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "User not found"));
+        }
+        var user = userOpt.get();
+
+        return ResponseEntity.ok(Map.of(
+                "userId", user.getId(),
+                "username", user.getUsername(),
+                "roles", List.of(user.getTipo()), // 👈 envia o tipoUsuario
+                "expiresAt", jwtUtil.extractExpiration(token).toInstant().toString()
+        ));
     }
+
 }
