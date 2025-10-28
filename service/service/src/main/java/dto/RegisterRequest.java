@@ -14,7 +14,7 @@ public class RegisterRequest {
     private String email;
     private String endereco;
     private String telefone;
-    private String password; // será a "senha" no user-service
+    private String senha;
     private TipoUsuario tipo;     // opcional: "CLIENTE" (default) ou "ORGANIZADOR"
 
 

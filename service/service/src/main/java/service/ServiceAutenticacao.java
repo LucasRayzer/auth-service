@@ -8,7 +8,6 @@ import model.TipoUsuario;
 import model.User;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional; // <== sugiro usar
 import repository.UserRepository;
 import security.JwtUtil;
 
@@ -23,11 +22,11 @@ public class ServiceAutenticacao {
     private final PasswordEncoder passwordEncoder;
     private final UserClient userClient;
 
-    public AuthResponse login(String username, String password) {
+    public AuthResponse login(String username, String senha) {
         var user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrado."));
 
-        if (!passwordEncoder.matches(password, user.getPassword())) {
+        if (!passwordEncoder.matches(senha, user.getSenha())) {
             throw new RuntimeException("Senha incorreta.");
         }
 
@@ -45,8 +44,8 @@ public class ServiceAutenticacao {
         // 1) salvar credencial no AUTH (username = email)
         User u = new User();
         u.setUsername(req.getEmail());
-        u.setPassword(passwordEncoder.encode(req.getPassword()));
-        u.setTipo(req.getTipo()); // 👈 salva no AUTH também
+        u.setSenha(passwordEncoder.encode(req.getSenha()));
+        u.setTipo(req.getTipo());
         userRepository.save(u);
 
         // 2) criar usuário no USER-SERVICE
@@ -55,7 +54,7 @@ public class ServiceAutenticacao {
         payload.email = req.getEmail();
         payload.endereco = req.getEndereco();
         payload.telefone = req.getTelefone();
-        payload.senha = passwordEncoder.encode(req.getPassword());
+        payload.senha = passwordEncoder.encode(req.getSenha());
         payload.tipo = (req.getTipo() == null) ? TipoUsuario.CLIENTE : req.getTipo();
 
         userClient.createUser(payload);

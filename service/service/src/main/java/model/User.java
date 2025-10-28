@@ -21,7 +21,7 @@ public class User {
     private TipoUsuario tipo;
 
     private String username;
-    private String password;
+    private String senha;
 
     @Column(length = 512)
     private String token;
