@@ -25,7 +25,7 @@ public class UserClient {
         public String email;
         public String endereco;
         public String telefone;
-        public String senha;  // atenção: nome do campo no user-service é "senha"
-        public TipoUsuario tipo;   // ex.: "CLIENTE"
+        public String senha;
+        public TipoUsuario tipo;
     }
 }
