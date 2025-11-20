@@ -15,7 +15,5 @@ public class RegisterRequest {
     private String endereco;
     private String telefone;
     private String senha;
-    private TipoUsuario tipo;     // opcional: "CLIENTE" (default) ou "ORGANIZADOR"
-
-
+    private TipoUsuario tipo;
 }
